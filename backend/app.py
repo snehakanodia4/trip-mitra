@@ -1,12 +1,11 @@
 from flask import Flask, request, jsonify
+from langchain_google_genai import ChatGoogleGenerativeAI
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 load_dotenv()
+import json
 
-from services.weather_service import parse_weather_data
-from services.hotel_service import parse_hotel_info
-from services.train_service import get_trains_to_and_from_city
 from services.gemini_agent import agent, build_itinerary_prompt
 
 
@@ -23,67 +22,65 @@ def home():
     return jsonify({"message": "AI Travel Planner API is running "})
 
 
-@app.route('/api/weather', methods=['POST'])
-def weather():
+@app.route("/chat", methods=["POST"])
+def chat():
     data = request.get_json()
-    city = data.get("city")
-    start_date = data.get("start_date")
-    end_date = data.get("end_date")
-    try:
-        result = parse_weather_data(city, start_date, end_date)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    message = data.get("message", "")
 
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0.2)
 
-@app.route('/api/hotels', methods=['POST'])
-def hotels():
-    data = request.get_json()
-    city = data.get("city")
-    start_date = data.get("start_date")
-    end_date = data.get("end_date")
-    adults = data.get("adults", 2)
-    try:
-        result = parse_hotel_info(city, start_date, end_date, adults)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    extraction_prompt = f"""
+    Extract the following details from this message:
+    - from_city
+    - to_city
+    - start_date (Date of tomorrow if not mentioned)
+    - end_date
+    - adults (default 2 if not mentioned)
+    - budget (default 10000 if not mentioned)
 
+    Message: "{message}"
 
-@app.route('/api/trains', methods=['POST'])
-def trains():
-    data = request.get_json()
-    from_city = data.get("from_city")
-    to_city = data.get("to_city")
-    start_date = data.get("start_date")
-    end_date = data.get("end_date")
-    try:
-        result = get_trains_to_and_from_city(from_city, to_city, start_date, end_date)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    Respond in pure JSON like this:
+    {{
+      "from_city": "...",
+      "to_city": "...",
+      "start_date": "...",
+      "end_date": "...",
+      "adults": ...,
+      "budget": ...
+    }}
+    """
 
+    extraction_response = llm.invoke(extraction_prompt)
+    raw_output = extraction_response.content.strip()
 
-@app.route('/api/itinerary', methods=['POST'])
-def generate_itinerary():
-    data = request.get_json()
-    from_city = data["from_city"]
-    to_city = data["to_city"]
-    start_date = data["start_date"]
-    end_date = data["end_date"]
-    adults = data.get("adults", 2)
-    budget = data.get("budget", 15000)
-
-    if not all([from_city, to_city, start_date, end_date]):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    query = build_itinerary_prompt(from_city, to_city, start_date, end_date, adults, budget)
+    # Handle code block formatting
+    if raw_output.startswith("```"):
+        raw_output = raw_output.strip("`")
+        if raw_output.lower().startswith("json"):
+            raw_output = raw_output[4:]  # remove the 'json' after ```
+        raw_output = raw_output.strip()
 
     try:
-        result = agent.run(query)
-        return jsonify({"itinerary": result})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        details = json.loads(raw_output)
+    except json.JSONDecodeError as e:
+        print("Invalid JSON output:", raw_output)
+        return jsonify({"error": f"Invalid JSON: {str(e)}", "raw_output": raw_output}), 500
+
+    from_city = details.get("from_city")
+    to_city = details.get("to_city")
+    start_date = details.get("start_date")
+    end_date = details.get("end_date")
+    adults = details.get("adults")
+    budget = details.get("budget")
+
+    prompt = build_itinerary_prompt(from_city, to_city, start_date, end_date, adults, budget)
+
+    response = agent.run(prompt)
+    print("Gemini raw response:", response.text)
+    return jsonify({"reply": response})
+
+
 
 
 if __name__ == "__main__":
