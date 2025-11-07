@@ -52,8 +52,8 @@ def get_trains_to_and_from_city(from_city, to_city, start_date, end_date):
         trains_from = get_train_details(to_station, from_station, end_date)
 
         return {
-            "to_city": {"from": from_city, "to": to_city, "trains": trains_to},
-            "from_city": {"from": to_city, "to": from_city, "trains": trains_from}
+            to_city: {"from": from_city, "to": to_city, "trains": trains_to},
+            from_city: {"from": to_city, "to": from_city, "trains": trains_from}
         }
     except Exception as e:
         return {"error": str(e)}
