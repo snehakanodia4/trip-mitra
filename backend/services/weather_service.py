@@ -3,7 +3,8 @@ import urllib.parse
 import pytz
 from datetime import datetime, timedelta
 import os
-
+from dotenv import load_dotenv
+load_dotenv()
 WEATHER_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 def get_maps_places(location, search_text="Most Popular places in "):
@@ -84,3 +85,29 @@ def parse_weather_data(destination, start_date, end_date):
         day_counter += 1
 
     return result
+
+# if __name__ == "__main__":
+#     print("=== WEATHER API TEST STARTED ===")
+#
+#     # Change this city and dates for testing
+#     test_city = "Varanasi"
+#     start_date = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+#     end_date = (datetime.now().date() + timedelta(days=3)).strftime("%Y-%m-%d")
+#
+#     try:
+#         print(f"\nTesting for city: {test_city}")
+#         print(f"Date range: {start_date} to {end_date}\n")
+#
+#         weather_data = parse_weather_data(test_city, start_date, end_date)
+#
+#         print("✅ API WORKING SUCCESSFULLY\n")
+#         print("Parsed Weather Output:\n")
+#         for day, info in weather_data.items():
+#             print(day, "->", info)
+#
+#     except Exception as e:
+#         print("\n❌ API TEST FAILED")
+#         print("Error:", e)
+#
+#     print("\n=== WEATHER API TEST FINISHED ===")
+#

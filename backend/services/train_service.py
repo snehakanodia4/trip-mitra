@@ -1,9 +1,10 @@
 import requests
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
-
+from dotenv import load_dotenv
+load_dotenv()
 IRCTC_API_KEY = os.getenv("IRCTC_API_KEY")
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro")
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 
 def get_station_code(city_name):
     prompt = f"What is the main IRCTC station code for {city_name}? Return only the code."
@@ -57,3 +58,4 @@ def get_trains_to_and_from_city(from_city, to_city, start_date, end_date):
         }
     except Exception as e:
         return {"error": str(e)}
+

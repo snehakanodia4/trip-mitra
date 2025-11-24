@@ -86,7 +86,7 @@ def chat():
     data = request.get_json()
     message = data.get("message", "")
 
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0.2)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2)
 
     extraction_prompt = f"""
     Extract the following details from this message:
@@ -134,7 +134,7 @@ def chat():
     to_city = details.get("to_city")
     start_date = details.get("start_date")
     end_date = details.get("end_date")
-    adults = details.get("adults", 2)
+    adults = details.get("adults")
     budget = details.get("budget")
 
     # Create agent with the extracted parameters
@@ -156,10 +156,8 @@ IMPORTANT INSTRUCTIONS:
 5. If a tool fails, note it and continue with other tools
 YOUR TASK: Create a comprehensive travel plan with the following sections:
 
-═══════════════════════════════════════════════════════════════
 
-## SECTION 1: TRANSPORTATION TO DESTINATION
-
+TRANSPORTATION :
 ### Trains:
 - Use the tool: get_trains (input: "fetch")
 - This returns BOTH outbound and return journey trains in one call
@@ -170,18 +168,18 @@ YOUR TASK: Create a comprehensive travel plan with the following sections:
 - For each train provide: Name, Number, Departure time, Arrival time, Duration, Available classes
 - If tool fails: Display "Train data unavailable due to API limit" and continue with other sections
 
-### Flights:
+### Flights:(Call only if budget is >10,000)
 - Use the tool: get_flights (input: "fetch")
 - This returns flights for complete round trip
 - From the results, recommend:
   * Top 3 flight options considering both outbound and return
 - Selection criteria: Lowest total cost, minimum stops, convenient timings
-- For each flight provide: Airline name, Flight code, Departure time, Arrival time, Total cost, Class
+- For each flight provide: Airline name, Flight code(if available), Departure time, Arrival time, Total cost, Class.
+-DO NOT write 'Not available' - if data is missing from API, skip that flight information.
 - If tool fails: Display "Flight data unavailable due to API limit" and continue with other sections
 
-═══════════════════════════════════════════════════════════════
 
-## SECTION 2: ACCOMMODATION
+ACCOMMODATION :
 
 - Use the tool: get_hotels (input: "fetch")
 - This returns all available hotels in {to_city}
@@ -198,9 +196,8 @@ YOUR TASK: Create a comprehensive travel plan with the following sections:
   * Photo link (from the API response)
 - If tool fails: Display "Hotel data unavailable due to API limit" and continue with other sections
 
-═══════════════════════════════════════════════════════════════
 
-## SECTION 3: DAY-WISE ITINERARY
+DAY-WISE ITINERARY:
 
 For each day of the trip, create a detailed plan:
 
@@ -236,9 +233,8 @@ For each day of the trip, create a detailed plan:
 - **IMPORTANT:** Add weather info WITHIN each day's section, NOT as a separate section
 - If tool fails: Display "Weather data unavailable due to API limit" and continue
 
-═══════════════════════════════════════════════════════════════
 
-## SECTION 4: PACKING LIST
+PACKING LIST:
 
 Create a practical packing checklist based on:
 - Weather conditions during travel dates
@@ -248,7 +244,7 @@ Create a practical packing checklist based on:
 
 Group items into categories: Clothing, Documents, Toiletries, Electronics, Medicines, Miscellaneous
 
-═══════════════════════════════════════════════════════════════
+
 
 ## SECTION 5: ESTIMATED COST BREAKDOWN
 
@@ -264,7 +260,7 @@ Provide a detailed budget breakdown:
 Compare with budget: ₹{budget}
 [Mention if within budget or suggest adjustments]
 
-═══════════════════════════════════════════════════════════════
+
 
 FORMATTING REQUIREMENTS:
 ✓ Use markdown formatting for clear readability
@@ -284,6 +280,7 @@ COMPLETION CHECKLIST (for your internal use):
 □ Added cost breakdown
 
 Once you have completed the above checklist, immediately provide your Final Answer with the complete itinerary in markdown format. Do not ask for more information or try to use tools again.
+
 """
     try:
         response = agent.run(prompt)
