@@ -1,7 +1,8 @@
 import requests
 import os
 import time
-
+from dotenv import load_dotenv
+load_dotenv()
 HOTELS_API_KEY = os.getenv("HOTELS_API_KEY")
 
 def get_destination_data(query):

@@ -19,7 +19,8 @@ except ImportError:
     from train_service import get_trains_to_and_from_city
     from flight_service import get_flight_data
 
-
+from dotenv import load_dotenv
+load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
@@ -64,9 +65,11 @@ def get_agent(from_city, to_city, start_date, end_date, adults):
     Creates a LangChain agent with travel planning tools.
     """
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-pro",
+        model="gemini-2.0-flash",
         google_api_key=GOOGLE_API_KEY,
-        temperature=0.7
+        temperature=0.5,
+        timeout=240,
+        max_retries=3
     )
 
     # Create tool instances
@@ -121,8 +124,9 @@ def get_agent(from_city, to_city, start_date, end_date, adults):
         llm,
         agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
         verbose=True,
-        handle_parsing_errors="Check your output and make sure it conforms! If you're done, use 'Final Answer:' to provide your response.",
-        max_iterations=15,
-        early_stopping_method="generate",
+        handle_parsing_errors="Provide your Final Answer now with the itinerary in markdown format.",
+        max_iterations=12,  # Reduced from 15
+        max_execution_time=180,  # 3 minutes max
+        early_stopping_method="force",  # Force stop if taking too long
         return_intermediate_steps=False
     )
