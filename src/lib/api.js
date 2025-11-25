@@ -1,7 +1,7 @@
 // Frontend -> Backend helper.
 // Replace the URL if your backend runs on a different host or port.
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://172.20.71.101:5000";
 
 export async function sendMessageToBackend(message) {
   const res = await fetch(`${BACKEND_URL}/chat`, {

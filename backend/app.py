@@ -5,9 +5,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 import json
-
 from services.gemini_agent import get_agent
+from sarvamai import SarvamAI
+import tempfile
 
+SARVAM_API_KEY = os.getenv("STT_API_KEY")
+if not SARVAM_API_KEY:
+    raise ValueError("SARVAM_API_KEY not found in .env file")
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
@@ -15,11 +19,65 @@ if not GOOGLE_API_KEY:
 
 # Set it in environment (for services that might need it)
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+sarvam_client = SarvamAI(api_subscription_key=SARVAM_API_KEY)
 app = Flask(__name__)
 CORS(app)
 @app.route('/')
 def home():
     return jsonify({"message": "AI Travel Planner API is running "})
+
+
+@app.route("/voice", methods=["POST"])
+def voice_to_text():
+    """Convert voice audio to text using Sarvam AI"""
+
+    if "audio" not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+
+    audio = request.files["audio"]
+
+    if audio.filename == "":
+        return jsonify({"error": "Empty audio file"}), 400
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
+
+    try:
+        audio.save(tmp.name)
+        tmp.close()
+
+        with open(tmp.name, "rb") as f:
+            response = sarvam_client.speech_to_text.translate(
+                file=f,
+                model="saaras:v2.5"
+            )
+
+        # Check if response has transcript
+        if hasattr(response, 'transcript') and response.transcript:
+            return jsonify({
+                "text": response.transcript,
+                "status": "success"
+            }), 200
+        else:
+            # Response might have different structure
+            return jsonify({
+                "text": str(response),
+                "status": "success"
+            }), 200
+
+    except Exception as e:
+        print(f"[ERROR] Voice-to-text failed: {str(e)}")
+        return jsonify({
+            "error": "Failed to transcribe audio",
+            "details": str(e)
+        }), 500
+
+    finally:
+        # Clean up temporary file
+        try:
+            if os.path.exists(tmp.name):
+                os.remove(tmp.name)
+        except Exception as e:
+            print(f"[WARNING] Could not delete temp file: {str(e)}")
 
 # @app.route("/chat", methods=["POST"])
 # def chat():
