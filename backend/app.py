@@ -1,5 +1,8 @@
 from flask import Flask, request, jsonify
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.output_parsers import PydanticOutputParser
+from langchain_core.prompts import PromptTemplate
+from pydantic import BaseModel, Field
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -20,6 +23,15 @@ if not GOOGLE_API_KEY:
 # Set it in environment (for services that might need it)
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 sarvam_client = SarvamAI(api_subscription_key=SARVAM_API_KEY)
+class TripDetails(BaseModel):
+    from_city: str = Field(description="Origin city name")
+    to_city: str = Field(description="Destination city name")
+    start_date: str = Field(description="Start date in YYYY-MM-DD format (assume tomorrow if not specified)")
+    end_date: str = Field(description="End date in YYYY-MM-DD format (calculate from duration if specified)")
+    adults: int = Field(default=2, description="Number of adult travelers")
+    budget: int = Field(default=10000, description="Estimated total budget in INR")
+
+
 app = Flask(__name__)
 CORS(app)
 @app.route('/')
@@ -146,54 +158,35 @@ def chat():
 
     llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2)
 
-    extraction_prompt = f"""
-    Extract the following details from this message:
-    - from_city
-    - to_city
-    - start_date (Date of tomorrow if not mentioned, format: YYYY-MM-DD)
-    - end_date (format: YYYY-MM-DD)
-    - adults (default 2 if not mentioned)
-    - budget (default 10000 if not mentioned)
+    parser = PydanticOutputParser(pydantic_object=TripDetails)
+    prompt_template = PromptTemplate(
+        template="""Extract trip details from the message below.
 
-    Message: "{message}"
-    **Date Handling Rules (VERY IMPORTANT):**
-    - If the user does **not specify dates**, assume the trip starts **from tomorrow**.
-    - If the user mentions trip duration (like "3 days" or "5-day trip"), calculate `end_date` accordingly.
-    -Output all dates in `YYYY-MM-DD` format.
-    
-    Respond in pure JSON like this:
-    {{
-      "from_city": "...",
-      "to_city": "...",
-      "start_date": "YYYY-MM-DD",
-      "end_date": "YYYY-MM-DD",
-      "adults": ,
-      "budget": 
-    }}
-    """
+Date Handling Rules:
+- If the user does not specify dates, assume the trip starts from tomorrow.
+- If the user mentions trip duration (like "3 days" or "5-day trip"), calculate end_date accordingly.
+- Output all dates in YYYY-MM-DD format.
 
-    extraction_response = llm.invoke(extraction_prompt)
-    raw_output = extraction_response.content.strip()
+{format_instructions}
 
-    # Handle code block formatting
-    if raw_output.startswith("```"):
-        raw_output = raw_output.strip("`")
-        if raw_output.lower().startswith("json"):
-            raw_output = raw_output[4:]
-        raw_output = raw_output.strip()
+User Message: "{message}"
+""",
+        input_variables=["message"],
+        partial_variables={"format_instructions": parser.get_format_instructions()},
+    )
 
     try:
-        details = json.loads(raw_output)
-    except json.JSONDecodeError as e:
-        print("Invalid JSON output:", raw_output)
-        return jsonify({"error": f"Invalid JSON: {str(e)}", "raw_output": raw_output}), 500
-
-    from_city = details.get("from_city")
-    to_city = details.get("to_city")
-    start_date = details.get("start_date")
-    end_date = details.get("end_date")
-    adults = details.get("adults")
-    budget = details.get("budget")
+        extraction_chain = prompt_template | llm | parser
+        details = extraction_chain.invoke({"message": message})
+        from_city = details.from_city
+        to_city = details.to_city
+        start_date = details.start_date
+        end_date = details.end_date
+        adults = details.adults
+        budget = details.budget
+    except Exception as e:
+        print(f"[ERROR] Pydantic parameter extraction failed: {e}")
+        return jsonify({"error": f"Failed to extract trip parameters: {str(e)}"}), 500
 
     # Create agent with the extracted parameters
     agent = get_agent(from_city, to_city, start_date, end_date, adults)
