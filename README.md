@@ -190,3 +190,6 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
 4. **Day-wise Itinerary:** Morning, afternoon, and evening activities with localized weather forecasts and transit recommendations.
 5. **Practical Packing Checklist:** Grouped by Clothing, Toiletries, Electronics, and Medicines.
 6. **Estimated Cost Breakdown:** Detailed itemized budget (tickets, hotel, local cabs, food, buffer) compared against user's budget.
+
+## Demo of Project: 
+[Watch Project Demo](https://github.com/user-attachments/assets/5da91b7c-30a0-44b4-bada-2388bbb33b30)
